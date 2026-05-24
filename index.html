@@ -891,26 +891,27 @@ nav{
 
 <!-- ── FIREBASE SDK ── -->
 <script type="module">
-  import { initializeApp }                                        from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc }                     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-  import { getAuth, createUserWithEmailAndPassword,
-           signInWithEmailAndPassword, signOut,
-           onAuthStateChanged, sendPasswordResetEmail }           from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { initializeApp }      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+           signOut, onAuthStateChanged, sendPasswordResetEmail }
+                                from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getFirestore, collection, addDoc, doc, setDoc, getDoc, query, where, getDocs }
+                                from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const firebaseConfig = {
-    apiKey: "AIzaSyC2cQcUaUflm5N-neMl7dy3FOzpw7ksJtY",
-    authDomain: "healthtracker-1ac61.firebaseapp.com",
-    projectId: "healthtracker-1ac61",
-    storageBucket: "healthtracker-1ac61.firebasestorage.app",
+    apiKey:            "AIzaSyC2cQcUaUflm5N-neMl7dy3FOzpw7ksJtY",
+    authDomain:        "healthtracker-1ac61.firebaseapp.com",
+    projectId:         "healthtracker-1ac61",
+    storageBucket:     "healthtracker-1ac61.firebasestorage.app",
     messagingSenderId: "591812663520",
-    appId: "1:591812663520:web:55b2cc1fb795e896859885"
+    appId:             "1:591812663520:web:55b2cc1fb795e896859885"
   };
 
   const app  = initializeApp(firebaseConfig);
   const db   = getFirestore(app);
   const auth = getAuth(app);
 
-  // ── Auth state — show/hide login screen ──────────────────────────────────────
+  // ── Auth state ───────────────────────────────────────────────────────────────
   onAuthStateChanged(auth, user => {
     if (user) {
       window._currentUser = user;
@@ -919,7 +920,6 @@ nav{
     } else {
       window._currentUser = null;
       document.getElementById('auth-screen').classList.remove('hidden');
-      // Hide everything else while logged out
       document.getElementById('apikey-screen').classList.add('hidden');
       document.getElementById('mode-select-screen').classList.add('hidden');
       document.getElementById('app').style.display = 'none';
@@ -937,12 +937,8 @@ nav{
     if (pass.length < 6) { err.textContent = 'Password must be at least 6 characters.'; return; }
     const btn = document.getElementById('auth-submit-btn');
     btn.disabled = true; btn.textContent = 'Creating account…';
-    try {
-      await createUserWithEmailAndPassword(auth, email, pass);
-    } catch(e) {
-      err.textContent = window._authErrMsg(e.code);
-      btn.disabled = false; btn.textContent = 'Create Account';
-    }
+    try { await createUserWithEmailAndPassword(auth, email, pass); }
+    catch(e) { err.textContent = window._authErrMsg(e.code); btn.disabled=false; btn.textContent='Create Account'; }
   };
 
   window.authSignIn = async function() {
@@ -953,28 +949,21 @@ nav{
     if (!email || !pass) { err.textContent = 'Please enter email and password.'; return; }
     const btn = document.getElementById('auth-submit-btn');
     btn.disabled = true; btn.textContent = 'Signing in…';
-    try {
-      await signInWithEmailAndPassword(auth, email, pass);
-    } catch(e) {
-      err.textContent = window._authErrMsg(e.code);
-      btn.disabled = false; btn.textContent = 'Sign In';
-    }
+    try { await signInWithEmailAndPassword(auth, email, pass); }
+    catch(e) { err.textContent = window._authErrMsg(e.code); btn.disabled=false; btn.textContent='Sign In'; }
   };
 
-  window.authSignOut = async function() {
-    await signOut(auth);
-  };
+  window.authSignOut  = async function() { await signOut(auth); };
 
   window.authResetPassword = async function() {
     const email = document.getElementById('auth-email').value.trim();
-    if (!email) { document.getElementById('auth-error').textContent = 'Enter your email first.'; return; }
+    const err   = document.getElementById('auth-error');
+    if (!email) { err.style.color='var(--red)'; err.textContent='Enter your email first.'; return; }
     try {
       await sendPasswordResetEmail(auth, email);
-      document.getElementById('auth-error').style.color = 'var(--green)';
-      document.getElementById('auth-error').textContent = '✅ Reset email sent! Check your inbox.';
-    } catch(e) {
-      document.getElementById('auth-error').textContent = window._authErrMsg(e.code);
-    }
+      err.style.color = 'var(--green)';
+      err.textContent = '✅ Reset email sent! Check your inbox.';
+    } catch(e) { err.style.color='var(--red)'; err.textContent = window._authErrMsg(e.code); }
   };
 
   window._authErrMsg = function(code) {
@@ -990,68 +979,182 @@ nav{
     return map[code] || 'Something went wrong. Please try again.';
   };
 
-  // ── Fetch Gemini key from Firestore ──────────────────────────────────────────
-  import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
+  // ── Gemini key from Firestore ────────────────────────────────────────────────
   window._fetchGeminiKey = async function() {
     try {
       const snap = await getDoc(doc(db, 'config', 'gemini'));
       if (snap.exists() && snap.data().api_key) {
-        _geminiKey = snap.data().api_key;
+        window._geminiKeyLoaded = snap.data().api_key;
         console.log('[Config] Gemini key loaded ✅');
-      } else {
-        console.warn('[Config] No Gemini key found in Firestore. Add it at: Firestore → config → gemini → api_key');
       }
-    } catch(e) {
-      console.warn('[Config] Could not fetch Gemini key:', e.message);
-    }
+    } catch(e) { console.warn('[Config] Key fetch failed:', e.message); }
   };
 
-  // ── Dataset save ─────────────────────────────────────────────────────────────
+  // ── User data sync ───────────────────────────────────────────────────────────
+  function userDoc(path) {
+    const uid = window._currentUser?.uid;
+    return uid ? doc(db, 'users', uid, ...path.split('/')) : null;
+  }
+
+  const _saveTimers = {};
+  window.syncSave = function(key, data) {
+    localStorage.setItem(key, JSON.stringify(data));
+    clearTimeout(_saveTimers[key]);
+    _saveTimers[key] = setTimeout(async () => {
+      const d = userDoc(key);
+      if (!d) return;
+      try { await setDoc(d, { data: JSON.stringify(data), updated: new Date().toISOString() }); }
+      catch(e) { console.warn('[Sync] Save failed:', key, e.message); }
+    }, 1500);
+  };
+
+  window.syncLoad = async function(key) {
+    const local = localStorage.getItem(key);
+    const d = userDoc(key);
+    if (!d) return local;
+    try {
+      const snap = await getDoc(d);
+      if (snap.exists()) {
+        const remote = snap.data().data;
+        localStorage.setItem(key, remote);
+        return remote;
+      }
+    } catch(e) { console.warn('[Sync] Load failed:', key, e.message); }
+    return local;
+  };
+
+  window.syncLoadAll = async function() {
+    const today = new Date().toISOString().split('T')[0];
+    const keys  = ['food_log','workout_log','ht_weight_log','ht_profile','ht_water_'+today];
+    await Promise.all(keys.map(async k => {
+      const v = await window.syncLoad(k);
+      if (v) localStorage.setItem(k, v);
+    }));
+    console.log('[Sync] User data loaded ✅');
+  };
+
+  // ── Dataset — save scan image + AI result ───────────────────────────────────
   window._shrinkBase64 = function(base64, mime, maxPx) {
     return new Promise(resolve => {
-      if (!mime || mime === 'application/pdf') { resolve(base64); return; }
       const img = new Image();
       img.onload = () => {
         let w = img.width, h = img.height;
         if (w > maxPx || h > maxPx) {
-          if (w >= h) { h = Math.round(h * maxPx / w); w = maxPx; }
-          else        { w = Math.round(w * maxPx / h); h = maxPx; }
+          if (w >= h) { h = Math.round(h*maxPx/w); w = maxPx; }
+          else        { w = Math.round(w*maxPx/h); h = maxPx; }
         }
         const c = document.createElement('canvas');
-        c.width = w; c.height = h;
-        c.getContext('2d').drawImage(img, 0, 0, w, h);
-        resolve(c.toDataURL('image/jpeg', 0.80).split(',')[1]);
+        c.width=w; c.height=h;
+        c.getContext('2d').drawImage(img,0,0,w,h);
+        resolve(c.toDataURL('image/jpeg',0.80).split(',')[1]);
       };
       img.onerror = () => resolve(base64);
-      img.src = 'data:' + mime + ';base64,' + base64;
+      img.src = 'data:'+mime+';base64,'+base64;
     });
   };
+
+  // ── Parse AI result text into structured JSON fields ──────────────────────
+  function _parseAiResult(text, category) {
+    const out = { raw_text: text };
+    try {
+      if (category === 'food') {
+        // Extract numbers from food analysis
+        const cal  = text.match(/(\d+)\s*(?:kcal|calories?)/i);
+        const prot = text.match(/protein[:\s]+(\d+\.?\d*)\s*g/i);
+        const carb = text.match(/carb[s\w]*[:\s]+(\d+\.?\d*)\s*g/i);
+        const fat  = text.match(/fat[s\w]*[:\s]+(\d+\.?\d*)\s*g/i);
+        const name = text.match(/##\s*(.+)|food[:\s]+([^
+]+)/i);
+        if (cal)  out.calories = parseInt(cal[1]);
+        if (prot) out.protein_g = parseFloat(prot[1]);
+        if (carb) out.carbs_g   = parseFloat(carb[1]);
+        if (fat)  out.fat_g     = parseFloat(fat[1]);
+        if (name) out.food_name = (name[1]||name[2]||'').trim().substring(0,80);
+      } else if (category === 'blood') {
+        // Extract key blood markers
+        const hb   = text.match(/(?:hemoglobin|hb|hgb)[:\s]+([\d.]+)/i);
+        const wbc  = text.match(/(?:wbc|white blood)[:\s]+([\d.]+)/i);
+        const rbc  = text.match(/(?:rbc|red blood)[:\s]+([\d.]+)/i);
+        const gluc = text.match(/(?:glucose|sugar|fbs)[:\s]+([\d.]+)/i);
+        const flag = text.match(/(?:abnormal|low|high|deficient|elevated)/i);
+        if (hb)   out.hemoglobin   = parseFloat(hb[1]);
+        if (wbc)  out.wbc          = parseFloat(wbc[1]);
+        if (rbc)  out.rbc          = parseFloat(rbc[1]);
+        if (gluc) out.glucose      = parseFloat(gluc[1]);
+        out.has_abnormal = !!flag;
+      } else if (category === 'xray' || category === 'mri') {
+        // Extract findings
+        const finding = text.match(/(?:finding|impression|conclusion)[s\w]*[:\s]*([^
+.]+)/i);
+        const normal  = /normal|unremarkable|no significant/i.test(text);
+        const urgent  = /urgent|immediate|emergency|critical/i.test(text);
+        if (finding) out.primary_finding = finding[1].trim().substring(0,200);
+        out.is_normal = normal;
+        out.is_urgent = urgent;
+      } else if (category === 'workout') {
+        const type = text.match(/(?:workout|exercise|activity)[:\s]+([^
+,]+)/i);
+        const dur  = text.match(/(\d+)\s*(?:min|minute)/i);
+        const cal  = text.match(/(\d+)\s*(?:kcal|calories?)\s*burned/i);
+        if (type) out.workout_type   = type[1].trim().substring(0,60);
+        if (dur)  out.duration_min   = parseInt(dur[1]);
+        if (cal)  out.calories_burned = parseInt(cal[1]);
+      }
+    } catch(e) { /* parsing failed, raw_text still saved */ }
+    return out;
+  }
 
   window.saveToDataset = async function(imageBase64, mimeType, aiResult, category, extraMeta) {
     extraMeta = extraMeta || {};
     try {
-      const thumbnail = await window._shrinkBase64(imageBase64, mimeType, 400);
-      const uid = window._currentUser ? window._currentUser.uid : 'anonymous';
-      const email = window._currentUser ? window._currentUser.email : '';
-      await addDoc(collection(db, 'dataset'), Object.assign({
-        category:       category,
-        image:          thumbnail,
-        mime_type:      'image/jpeg',
-        ai_result:      aiResult,
+      // Save at 512px — good enough for visual ML training, stays under 1MB
+      const thumbnail = await window._shrinkBase64(imageBase64, mimeType, 512);
+      const uid       = window._currentUser?.uid   || 'anonymous';
+      const email     = window._currentUser?.email || '';
+
+      // Parse AI result into structured fields
+      const parsed = _parseAiResult(
+        typeof aiResult === 'string' ? aiResult : JSON.stringify(aiResult),
+        category
+      );
+
+      // Build the training record
+      const record = {
+        // ── Identity ──────────────────────────────────────────────────────────
+        category,           // 'food' | 'blood' | 'xray' | 'mri' | 'workout'
+        uid,
+        user_email:     email,
+        timestamp:      new Date().toISOString(),
+        date:           new Date().toISOString().split('T')[0],
+
+        // ── Image ─────────────────────────────────────────────────────────────
+        image_base64:   thumbnail,     // 512px compressed JPEG
+        image_size_kb:  Math.round((thumbnail.length * 0.75) / 1024),
+        original_mime:  mimeType,
+
+        // ── AI Output (structured + raw) ──────────────────────────────────────
+        ai_structured:  parsed,        // extracted key fields
+        ai_raw:         typeof aiResult === 'string'
+                          ? aiResult.substring(0, 3000)
+                          : JSON.stringify(aiResult).substring(0, 3000),
+
+        // ── Model info (for training provenance) ──────────────────────────────
         model:          'gemini-2.5-flash-lite',
         prompt_version: 'v1',
-        timestamp:      new Date().toISOString(),
-        uid:            uid,
-        user_email:     email,
-        device:         navigator.userAgent.substring(0, 120),
-        reviewed:       false,
-        quality_rating: null
-      }, extraMeta));
-      console.log('[Dataset] Saved:', category, 'by', email);
-    } catch(err) {
-      console.warn('[Dataset] Save failed:', err.message);
-    }
+        device_type:    /Mobile|Android|iPhone/i.test(navigator.userAgent) ? 'mobile' : 'desktop',
+
+        // ── Quality labels (you fill these later via Firebase Console) ─────────
+        reviewed:       false,   // set to true after you verify the AI result
+        quality_score:  null,    // 1-5 rating you assign
+        correct_label:  null,    // corrected label if AI was wrong
+      };
+
+      // Merge any extra metadata (food_name, calories etc from calling code)
+      Object.assign(record, extraMeta);
+
+      await addDoc(collection(db, 'dataset'), record);
+      console.log('[Dataset] ✅ Saved:', category, '|', record.image_size_kb + 'kb');
+    } catch(e) { console.warn('[Dataset] Save failed:', e.message); }
   };
 </script>
 
@@ -1719,7 +1822,7 @@ function authSwitchTab(m)   { window.authSwitchTab && window.authSwitchTab(m); }
 // ── CONFIG ─────────────────────────────────────────────────────────────────────
 // ── GEMINI KEY — fetched from Firebase on load ───────────────────────────────
 let _geminiKey = '';
-function getGeminiKey() { return _geminiKey; }
+function getGeminiKey() { return window._geminiKeyLoaded || _geminiKey; }
 let DAILY = { calories:2000, protein:150, carbs:200, fat:65 };
 let selectedDate = new Date();
 let currentCalMonth = new Date();
@@ -2087,6 +2190,7 @@ function obFinish() {
     targets:   DAILY
   };
   localStorage.setItem('ht_profile', JSON.stringify(profile));
+  if (window.syncSave) window.syncSave('ht_profile', profile);
   document.getElementById('onboarding-screen').classList.add('hidden');
   showToast('Welcome, '+profile.name+'! 🎉');
   applyProfile(profile);
@@ -2198,7 +2302,11 @@ function renderStreak() {
 function getWaterGoal() { return JSON.parse(localStorage.getItem('ht_profile')||'{}').waterGoal||8; }
 function getWaterKey()   { return 'ht_water_'+getSelDate(); }
 function getWaterCount() { return parseInt(localStorage.getItem(getWaterKey())||'0'); }
-function saveWater(n)    { localStorage.setItem(getWaterKey(), Math.max(0,Math.min(getWaterGoal()+4,n))); }
+function saveWater(n) {
+  const val = Math.max(0, Math.min(getWaterGoal()+4, n));
+  if (window.syncSave) { window.syncSave(getWaterKey(), val); }
+  else { localStorage.setItem(getWaterKey(), val); }
+}
 function logWater(d)     { saveWater(getWaterCount()+d); renderWater(); if(d>0) showToast('💧 Water logged!'); }
 function renderWater() {
   const goal=getWaterGoal(), cnt=getWaterCount();
@@ -2217,7 +2325,10 @@ function renderWater() {
 
 // ── WEIGHT ────────────────────────────────────────────────────────────────────
 function getWeightLog()  { try{return JSON.parse(localStorage.getItem('ht_weight_log')||'[]')}catch{return []} }
-function saveWeightLog(l){ localStorage.setItem('ht_weight_log',JSON.stringify(l)) }
+function saveWeightLog(l){
+  if (window.syncSave) { window.syncSave('ht_weight_log', l); }
+  else { localStorage.setItem('ht_weight_log', JSON.stringify(l)); }
+}
 function logWeight() {
   const val=parseFloat(document.getElementById('weight-input').value);
   const unit=document.getElementById('weight-unit-select').value;
@@ -2408,7 +2519,10 @@ function renderWeeklyReport() {
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
 function loadLog(key) { try{return JSON.parse(localStorage.getItem(key)||'[]')}catch{return []} }
-function saveLog(key,data) { localStorage.setItem(key,JSON.stringify(data)) }
+function saveLog(key,data) {
+  if (window.syncSave) { window.syncSave(key, data); }
+  else { localStorage.setItem(key, JSON.stringify(data)); }
+}
 function targetedFood()    { return loadLog('food_log').filter(e=>e.date===getSelDate()) }
 function targetedWorkout() { return loadLog('workout_log').filter(e=>e.date===getSelDate()) }
 function foodTotals(entries) {
@@ -3089,9 +3203,14 @@ window.authSwitchTab = function authSwitchTab(mode) {
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 // Called by Firebase onAuthStateChanged once user is confirmed logged in
-window._authReady = function() {
-  // User is logged in — no separate bar needed, sign out is in header
-  // API key is hardcoded — skip key screen entirely
+window._authReady = async function() {
+  // 1. Fetch Gemini key + all user data from Firestore in parallel
+  await Promise.all([
+    window._fetchGeminiKey  ? window._fetchGeminiKey()  : Promise.resolve(),
+    window.syncLoadAll      ? window.syncLoadAll()       : Promise.resolve()
+  ]);
+
+  // 2. Boot the app
   document.getElementById('apikey-screen').classList.add('hidden');
   if (!localStorage.getItem('ht_mode')) {
     document.getElementById('mode-select-screen').classList.remove('hidden');
