@@ -561,37 +561,7 @@ nav{
 .ai-reasoning::-webkit-scrollbar{display:none}
 
 /* ── API KEY SCREEN ── */
-#apikey-screen{
-  position:fixed;inset:0;z-index:10000;
-  display:flex;align-items:center;justify-content:center;padding:24px;
-  background:
-    radial-gradient(ellipse 80% 60% at 20% 0%,rgba(77,159,255,.15) 0%,transparent 60%),
-    radial-gradient(ellipse 60% 50% at 80% 100%,rgba(199,125,255,.12) 0%,transparent 60%),
-    var(--bg1);
-}
-#apikey-screen.hidden{display:none}
-.ak-card{
-  width:100%;max-width:400px;background:var(--card-bg);
-  border:1px solid var(--glass-border);backdrop-filter:blur(32px) saturate(180%);
-  border-radius:28px;padding:36px 26px 30px;text-align:center;
-}
-.ak-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:26px;
-  background:linear-gradient(135deg,var(--green),var(--blue));
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:5px}
-.ak-sub{color:var(--sub);font-size:13px;margin-bottom:26px;line-height:1.55}
-.ak-label{text-align:left;font-size:10px;color:var(--sub);text-transform:uppercase;
-  letter-spacing:.8px;margin-bottom:7px;font-weight:600}
-.ak-input{width:100%;padding:13px 15px;background:var(--input-bg);
-  border:1px solid var(--glass-border);border-radius:13px;color:var(--text);
-  font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:border-color .2s;margin-bottom:6px}
-.ak-input:focus{border-color:var(--green)}
-.ak-hint{font-size:11px;color:var(--sub);text-align:left;margin-bottom:20px}
 .ak-hint a{color:var(--blue);text-decoration:none}
-.ak-btn{width:100%;padding:15px;background:linear-gradient(135deg,var(--green),var(--teal));
-  color:#0a0a1a;border:none;border-radius:13px;font-family:'Syne',sans-serif;font-weight:800;
-  font-size:14px;cursor:pointer;transition:transform .15s;box-shadow:0 6px 26px rgba(0,245,160,.22)}
-.ak-btn:active{transform:scale(.97)}
-.ak-error{font-size:12px;color:var(--red);margin-top:10px;min-height:18px}
 
 /* ── MODE SELECT SCREEN ── */
 #mode-select-screen{
@@ -931,8 +901,7 @@ nav{
     } else {
       window._currentUser = null;
       document.getElementById('auth-screen').classList.remove('hidden');
-      document.getElementById('apikey-screen').classList.add('hidden');
-      document.getElementById('mode-select-screen').classList.add('hidden');
+            document.getElementById('mode-select-screen').classList.add('hidden');
       document.getElementById('app').style.display = 'none';
       document.getElementById('health-scan-screen').classList.add('hidden');
     }
@@ -943,25 +912,41 @@ nav{
     const email = document.getElementById('auth-email').value.trim();
     const pass  = document.getElementById('auth-pass').value;
     const err   = document.getElementById('auth-error');
+    const btn   = document.getElementById('auth-submit-btn');
     err.textContent = ''; err.style.color = 'var(--red)';
-    if (!email || !pass) { err.textContent = 'Please enter email and password.'; return; }
+    if (!email) { err.textContent = 'Please enter your email.'; return; }
+    if (!pass)  { err.textContent = 'Please enter your password.'; return; }
     if (pass.length < 6) { err.textContent = 'Password must be at least 6 characters.'; return; }
-    const btn = document.getElementById('auth-submit-btn');
     btn.disabled = true; btn.textContent = 'Creating account…';
-    try { await createUserWithEmailAndPassword(auth, email, pass); }
-    catch(e) { err.textContent = window._authErrMsg(e.code); btn.disabled=false; btn.textContent='Create Account'; }
+    try {
+      await createUserWithEmailAndPassword(auth, email, pass);
+      // success — onAuthStateChanged will fire and boot the app
+    } catch(e) {
+      console.error('[Auth] SignUp error:', e.code, e.message);
+      err.textContent = window._authErrMsg(e.code);
+      btn.disabled = false;
+      btn.textContent = 'Create Account';
+    }
   };
 
   window.authSignIn = async function() {
     const email = document.getElementById('auth-email').value.trim();
     const pass  = document.getElementById('auth-pass').value;
     const err   = document.getElementById('auth-error');
+    const btn   = document.getElementById('auth-submit-btn');
     err.textContent = ''; err.style.color = 'var(--red)';
-    if (!email || !pass) { err.textContent = 'Please enter email and password.'; return; }
-    const btn = document.getElementById('auth-submit-btn');
+    if (!email) { err.textContent = 'Please enter your email.'; return; }
+    if (!pass)  { err.textContent = 'Please enter your password.'; return; }
     btn.disabled = true; btn.textContent = 'Signing in…';
-    try { await signInWithEmailAndPassword(auth, email, pass); }
-    catch(e) { err.textContent = window._authErrMsg(e.code); btn.disabled=false; btn.textContent='Sign In'; }
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+      // success — onAuthStateChanged will fire and boot the app
+    } catch(e) {
+      console.error('[Auth] SignIn error:', e.code, e.message);
+      err.textContent = window._authErrMsg(e.code);
+      btn.disabled = false;
+      btn.textContent = 'Sign In';
+    }
   };
 
   window.authSignOut  = async function() { await signOut(auth); };
@@ -1168,11 +1153,38 @@ nav{
 
 <!-- ── AUTH BRIDGE (makes module functions available to onclick handlers) ── -->
 <script>
-function authSignIn()       { window.authSignIn && window.authSignIn(); }
-function authSignUp()       { window.authSignUp && window.authSignUp(); }
+function authSignIn() {
+  if (window.authSignIn) window.authSignIn();
+  else {
+    // Firebase not loaded yet — show message
+    const e = document.getElementById('auth-error');
+    if(e){ e.style.color='var(--red)'; e.textContent='Still loading, please wait a moment and try again.'; }
+  }
+}
+function authSignUp() {
+  if (window.authSignUp) window.authSignUp();
+  else {
+    const e = document.getElementById('auth-error');
+    if(e){ e.style.color='var(--red)'; e.textContent='Still loading, please wait a moment and try again.'; }
+  }
+}
 function authSignOut()      { window.authSignOut && window.authSignOut(); }
 function authResetPassword(){ window.authResetPassword && window.authResetPassword(); }
 function authSwitchTab(m)   { window.authSwitchTab && window.authSwitchTab(m); }
+
+// Safety net — if button stays disabled over 10s, re-enable it
+setInterval(function() {
+  const btn = document.getElementById('auth-submit-btn');
+  if (btn && btn.disabled) {
+    const spinning = btn.textContent.includes('…');
+    if (spinning) {
+      btn.disabled = false;
+      btn.textContent = btn.textContent.includes('Creating') ? 'Create Account' : 'Sign In';
+      const e = document.getElementById('auth-error');
+      if(e){ e.style.color='var(--red)'; e.textContent='Request timed out. Check your connection and try again.'; }
+    }
+  }
+}, 10000);
 </script>
 </head>
 <body>
@@ -1205,17 +1217,7 @@ function authSwitchTab(m)   { window.authSwitchTab && window.authSwitchTab(m); }
 </div>
 
 <!-- ── API KEY SCREEN ── -->
-<div id="apikey-screen">
-  <div class="ak-card">
-    <div class="ak-logo">⚡ HealthTrack</div>
-    <div class="ak-sub">Enter your Gemini API key to get started.<br>Stored locally on your device only.</div>
-    <div class="ak-label">Gemini API Key</div>
-    <input class="ak-input" type="password" id="apikey-input" placeholder="AIza…" autocomplete="off" spellcheck="false"/>
-    <div class="ak-hint">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a></div>
-    <button class="ak-btn" onclick="submitApiKey()">Continue →</button>
-    <div class="ak-error" id="apikey-error"></div>
-  </div>
-</div>
+
 
 <!-- ── MODE SELECT SCREEN ── -->
 <div id="mode-select-screen" class="hidden">
@@ -2030,19 +2032,7 @@ Be thorough but accessible. End with a disclaimer to consult a specialist.`
   }
 }
 
-function submitApiKey() {
-  const val = document.getElementById('apikey-input').value.trim();
-  if (!val) { document.getElementById('apikey-error').textContent = 'Please enter your API key.'; return; }
-  if (!val.startsWith('AIza')) { document.getElementById('apikey-error').textContent = 'Doesn\'t look like a valid Gemini key (should start with AIza).'; return; }
-  localStorage.setItem('gemini_api_key', val);
-  document.getElementById('apikey-screen').classList.add('hidden');
-  // Show mode select if not chosen yet
-  if (!localStorage.getItem('ht_mode')) {
-    document.getElementById('mode-select-screen').classList.remove('hidden');
-  } else {
-    initFromSavedMode();
-  }
-}
+
 
 // ── ONBOARDING ─────────────────────────────────────────────────────────────────
 let obGoal = '';
@@ -3219,8 +3209,7 @@ window._authReady = async function() {
   ]);
 
   // 2. Boot the app
-  document.getElementById('apikey-screen').classList.add('hidden');
-  if (!localStorage.getItem('ht_mode')) {
+    if (!localStorage.getItem('ht_mode')) {
     document.getElementById('mode-select-screen').classList.remove('hidden');
   } else {
     initFromSavedMode();
