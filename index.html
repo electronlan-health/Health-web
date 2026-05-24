@@ -841,6 +841,7 @@ nav{
   width:100%;max-width:400px;background:var(--card-bg);
   border:1px solid var(--glass-border);backdrop-filter:blur(32px) saturate(180%);
   border-radius:28px;padding:36px 26px 30px;text-align:center;
+  position:relative;z-index:10002;
 }
 .auth-logo{
   font-family:'Syne',sans-serif;font-weight:800;font-size:26px;
@@ -853,7 +854,9 @@ nav{
   border-radius:12px;padding:3px;margin-bottom:22px;gap:3px}
 .auth-tab{flex:1;padding:9px;border:none;background:none;cursor:pointer;
   font-family:'Syne',sans-serif;font-weight:700;font-size:12px;
-  color:var(--sub);border-radius:9px;transition:all .2s}
+  color:var(--sub);border-radius:9px;transition:all .2s;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;}
 .auth-tab.active{background:var(--glass-hover);color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,.2)}
 .auth-field{margin-bottom:14px;text-align:left}
 .auth-label{font-size:10px;color:var(--sub);text-transform:uppercase;
@@ -861,8 +864,10 @@ nav{
 .auth-input{
   width:100%;padding:13px 15px;background:var(--input-bg);
   border:1px solid var(--glass-border);border-radius:13px;color:var(--text);
-  font-family:'DM Sans',sans-serif;font-size:15px;outline:none;
+  font-family:'DM Sans',sans-serif;font-size:16px;outline:none;
   transition:border-color .2s;
+  -webkit-appearance:none;
+  box-sizing:border-box;
 }
 .auth-input:focus{border-color:var(--green)}
 .auth-btn{
@@ -872,14 +877,20 @@ nav{
   font-family:'Syne',sans-serif;font-weight:800;font-size:14px;
   cursor:pointer;transition:transform .15s;
   box-shadow:0 6px 26px rgba(0,245,160,.22);
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+  user-select:none;
+  position:relative;z-index:1;
 }
 .auth-btn:active{transform:scale(.97)}
-.auth-btn:disabled{opacity:.6;cursor:not-allowed}
+.auth-btn:disabled{opacity:.6;cursor:not-allowed;pointer-events:none}
 .auth-error{font-size:12px;color:var(--red);margin-top:10px;min-height:18px;text-align:center}
 .auth-forgot{
   display:block;text-align:center;font-size:11px;color:var(--sub);
   margin-top:14px;cursor:pointer;transition:color .15s;background:none;border:none;
-  font-family:'DM Sans',sans-serif;width:100%;
+  font-family:'DM Sans',sans-serif;width:100%;padding:8px 0;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
 }
 .auth-forgot:hover{color:var(--blue)}
 .auth-signout{background:none;border:none;color:var(--sub);font-size:10px;
@@ -1063,8 +1074,7 @@ nav{
         const prot = text.match(/protein[:\s]+(\d+\.?\d*)\s*g/i);
         const carb = text.match(/carb[s\w]*[:\s]+(\d+\.?\d*)\s*g/i);
         const fat  = text.match(/fat[s\w]*[:\s]+(\d+\.?\d*)\s*g/i);
-        const name = text.match(/##\s*(.+)|food[:\s]+([^
-]+)/i);
+        const name = text.match(/##\s*(.+)|food[:\s]+([^\n]+)/i);
         if (cal)  out.calories = parseInt(cal[1]);
         if (prot) out.protein_g = parseFloat(prot[1]);
         if (carb) out.carbs_g   = parseFloat(carb[1]);
@@ -1084,16 +1094,14 @@ nav{
         out.has_abnormal = !!flag;
       } else if (category === 'xray' || category === 'mri') {
         // Extract findings
-        const finding = text.match(/(?:finding|impression|conclusion)[s\w]*[:\s]*([^
-.]+)/i);
+        const finding = text.match(/(?:finding|impression|conclusion)[s\w]*[:\s]*([^\n.]+)/i);
         const normal  = /normal|unremarkable|no significant/i.test(text);
         const urgent  = /urgent|immediate|emergency|critical/i.test(text);
         if (finding) out.primary_finding = finding[1].trim().substring(0,200);
         out.is_normal = normal;
         out.is_urgent = urgent;
       } else if (category === 'workout') {
-        const type = text.match(/(?:workout|exercise|activity)[:\s]+([^
-,]+)/i);
+        const type = text.match(/(?:workout|exercise|activity)[:\s]+([^\n,]+)/i);
         const dur  = text.match(/(\d+)\s*(?:min|minute)/i);
         const cal  = text.match(/(\d+)\s*(?:kcal|calories?)\s*burned/i);
         if (type) out.workout_type   = type[1].trim().substring(0,60);
@@ -3221,7 +3229,6 @@ window._authReady = async function() {
   updateGreeting();
   updateDateBadge();
   renderWeightTracker();
-  refreshAll();
   renderWeeklyReport();
   document.getElementById('pb-cal').style.background='var(--orange)';
   document.getElementById('pb-prot').style.background='var(--teal)';
